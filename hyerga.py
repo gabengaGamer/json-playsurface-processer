@@ -25,6 +25,14 @@ def create_blender_matrix(l2w):
     blender_matrix = mathutils.Matrix(l2w).transposed()  
     return blender_matrix
 
+def apply_decomposed_transformations(obj, matrix):
+    translation, rotation, scale = matrix.decompose()
+    
+    obj.location = translation
+    obj.rotation_mode = 'QUATERNION'
+    obj.rotation_quaternion = rotation
+    obj.scale = scale
+
 def import_and_position_model(model):
     geom_path = os.path.join(MODEL_DIRECTORY, model["geom_name"])
     if not os.path.exists(geom_path):
@@ -39,7 +47,7 @@ def import_and_position_model(model):
     l2w_matrix = create_blender_matrix(model["l2w"])
 
     for obj in imported_objects:
-        obj.matrix_world = l2w_matrix
+        apply_decomposed_transformations(obj, l2w_matrix)
 
 def build_scene():
     models = parse_json_file(JSON_FILE_PATH)
