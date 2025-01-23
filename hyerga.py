@@ -23,7 +23,14 @@ def parse_json_file(file_path):
 
 def create_blender_matrix(l2w):
     blender_matrix = mathutils.Matrix(l2w).transposed()  
-    return blender_matrix
+
+    conversion_matrix = mathutils.Matrix((
+        (1,  0,  0,  0),
+        (0,  0,  1,  0),
+        (0, -1,  0,  0),
+        (0,  0,  0,  1),
+    ))
+    return conversion_matrix @ blender_matrix
 
 def apply_decomposed_transformations(obj, matrix):
     translation, rotation, scale = matrix.decompose()
