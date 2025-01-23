@@ -28,9 +28,9 @@ def create_blender_matrix(l2w):
 def apply_decomposed_transformations(obj, matrix):
     translation, rotation, scale = matrix.decompose()
     
-    obj.location = translation
     obj.rotation_mode = 'QUATERNION'
     obj.rotation_quaternion = rotation
+    obj.location = translation
     obj.scale = scale
 
 def import_and_position_model(model):
