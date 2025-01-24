@@ -9,6 +9,8 @@ MODEL_DIRECTORY = r"C:\Users\GameSpy\Downloads\IneV\rigidgeom" # Put here your g
 
 JSON_FILE_PATH = r"C:\Users\GameSpy\Downloads\IneV\data.json" # Put here exported playsurface .json from DFSViewer.
 
+imported_models_cache = {}
+
 def parse_json_file(file_path):
     with open(file_path, "r") as file:
         data = json.load(file)
@@ -75,29 +77,40 @@ def import_and_position_model(model):
     if not os.path.exists(geom_path):
         return
 
-    bpy.ops.import_scene.gltf(filepath=geom_path, merge_vertices=True)
-
-    imported_objects = bpy.context.selected_objects
-    if not imported_objects:
-        return
-
     l2w_matrix = create_blender_matrix(model["l2w"])
 
-    meshes_to_join = [obj for obj in imported_objects if obj.type == 'MESH']
-    if meshes_to_join:
-        for obj in meshes_to_join:
-            obj.select_set(True)
+    if model["geom_name"] in imported_models_cache:
+        imported_object = imported_models_cache[model["geom_name"]]
+        new_instance = imported_object.copy()
+        new_instance.data = imported_object.data.copy()
+        bpy.context.collection.objects.link(new_instance)
 
-        bpy.context.view_layer.objects.active = meshes_to_join[0]
-        bpy.ops.object.join()
-
-        unified_object = meshes_to_join[0]
-        apply_decomposed_transformations(unified_object, l2w_matrix)
-        rename_and_deduplicate_materials(unified_object, geom_path)
+        new_instance.matrix_world = l2w_matrix
     else:
-        for obj in imported_objects:
-            apply_decomposed_transformations(obj, l2w_matrix)
-            rename_and_deduplicate_materials(obj, geom_path)
+        bpy.ops.import_scene.gltf(filepath=geom_path, merge_vertices=True)
+
+        imported_objects = bpy.context.selected_objects
+        if not imported_objects:
+            return
+
+        meshes_to_join = [obj for obj in imported_objects if obj.type == 'MESH']
+        if meshes_to_join:
+            for obj in meshes_to_join:
+                obj.select_set(True)
+
+            bpy.context.view_layer.objects.active = meshes_to_join[0]
+            bpy.ops.object.join()
+
+            unified_object = meshes_to_join[0]
+            unified_object.matrix_world = l2w_matrix
+            rename_and_deduplicate_materials(unified_object, geom_path)
+            imported_models_cache[model["geom_name"]] = unified_object
+        else:
+            for obj in imported_objects:
+                obj.matrix_world = l2w_matrix
+                rename_and_deduplicate_materials(obj, geom_path)
+                imported_models_cache[model["geom_name"]] = obj
+
 
 def rotate_entire_scene():
     scene_rotation = mathutils.Matrix.Rotation(math.radians(90), 4, 'X')
