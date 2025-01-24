@@ -2,6 +2,7 @@ import bpy
 import os
 import json
 import mathutils
+import math
 
 MODEL_DIRECTORY = r"C:\Users\GameSpy\Downloads\IneV\rigidgeom"
 
@@ -22,15 +23,13 @@ def parse_json_file(file_path):
     return models
 
 def create_blender_matrix(l2w):
-    blender_matrix = mathutils.Matrix(l2w).transposed()  
+    blender_matrix = mathutils.Matrix(l2w).transposed()
 
-    conversion_matrix = mathutils.Matrix((
-        (1,  0,  0,  0),
-        (0,  0,  1,  0),
-        (0, -1,  0,  0),
-        (0,  0,  0,  1),
-    ))
-    return conversion_matrix @ blender_matrix
+    z_up_to_y_up = mathutils.Matrix.Rotation(math.pi / 2, 4, 'X')
+    rotate_minus_180_x = mathutils.Matrix.Rotation(math.radians(-180), 4, 'X')
+    corrected_matrix = blender_matrix @ z_up_to_y_up @ rotate_minus_180_x
+
+    return corrected_matrix
 
 def apply_decomposed_transformations(obj, matrix):
     translation, rotation, scale = matrix.decompose()
@@ -56,6 +55,13 @@ def import_and_position_model(model):
     for obj in imported_objects:
         apply_decomposed_transformations(obj, l2w_matrix)
 
+def rotate_entire_scene():
+    scene_rotation = mathutils.Matrix.Rotation(math.radians(-90), 4, 'X')
+    
+    for obj in bpy.data.objects:
+        if obj.type in {'MESH', 'EMPTY'}:
+            obj.matrix_world = scene_rotation @ obj.matrix_world
+
 def build_scene():
     models = parse_json_file(JSON_FILE_PATH)
 
@@ -64,5 +70,7 @@ def build_scene():
 
     for model in models:
         import_and_position_model(model)
+
+    rotate_entire_scene()
 
 build_scene()
