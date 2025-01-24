@@ -3,10 +3,11 @@ import os
 import json
 import mathutils
 import math
+import re
 
-MODEL_DIRECTORY = r"C:\Users\GameSpy\Downloads\IneV\rigidgeom"
+MODEL_DIRECTORY = r"C:\Users\GameSpy\Downloads\IneV\rigidgeom" # Put here your gltf models.
 
-JSON_FILE_PATH = r"C:\Users\GameSpy\Downloads\IneV\data.json"
+JSON_FILE_PATH = r"C:\Users\GameSpy\Downloads\IneV\data.json" # Put here exported playsurface .json from DFSViewer.
 
 def parse_json_file(file_path):
     with open(file_path, "r") as file:
@@ -38,13 +39,43 @@ def apply_decomposed_transformations(obj, matrix):
     obj.rotation_quaternion = rotation
     obj.location = translation
     obj.scale = scale
+    
+def rename_and_deduplicate_materials(obj, gltf_path):
+    with open(gltf_path, "r") as file:
+        gltf_data = json.load(file)
+
+    images = gltf_data.get("images", [])
+    if not images:
+        return
+
+    texture_names = {
+        index: os.path.splitext(os.path.basename(image.get("uri", f"Texture_{index}")))[0]
+        for index, image in enumerate(images)
+    }
+
+    material_index_pattern = re.compile(r"Material[._]?(\d+)?")
+
+    if obj.type == 'MESH':
+        for slot in obj.material_slots:
+            if slot.material:
+                match = material_index_pattern.search(slot.material.name)
+                if match:
+                    texture_index = int(match.group(1) or 0)
+                    if texture_index in texture_names:
+                        new_name = texture_names[texture_index]
+
+                        existing_material = bpy.data.materials.get(new_name)
+                        if existing_material:
+                            slot.material = existing_material
+                        else:
+                            slot.material.name = new_name
 
 def import_and_position_model(model):
     geom_path = os.path.join(MODEL_DIRECTORY, model["geom_name"])
     if not os.path.exists(geom_path):
         return
 
-    bpy.ops.import_scene.gltf(filepath=geom_path)
+    bpy.ops.import_scene.gltf(filepath=geom_path, merge_vertices=True)
 
     imported_objects = bpy.context.selected_objects
     if not imported_objects:
@@ -52,11 +83,24 @@ def import_and_position_model(model):
 
     l2w_matrix = create_blender_matrix(model["l2w"])
 
-    for obj in imported_objects:
-        apply_decomposed_transformations(obj, l2w_matrix)
+    meshes_to_join = [obj for obj in imported_objects if obj.type == 'MESH']
+    if meshes_to_join:
+        for obj in meshes_to_join:
+            obj.select_set(True)
+
+        bpy.context.view_layer.objects.active = meshes_to_join[0]
+        bpy.ops.object.join()
+
+        unified_object = meshes_to_join[0]
+        apply_decomposed_transformations(unified_object, l2w_matrix)
+        rename_and_deduplicate_materials(unified_object, geom_path)
+    else:
+        for obj in imported_objects:
+            apply_decomposed_transformations(obj, l2w_matrix)
+            rename_and_deduplicate_materials(obj, geom_path)
 
 def rotate_entire_scene():
-    scene_rotation = mathutils.Matrix.Rotation(math.radians(-90), 4, 'X')
+    scene_rotation = mathutils.Matrix.Rotation(math.radians(90), 4, 'X')
     
     for obj in bpy.data.objects:
         if obj.type in {'MESH', 'EMPTY'}:
