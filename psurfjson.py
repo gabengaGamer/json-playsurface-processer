@@ -50,27 +50,35 @@ def rename_and_deduplicate_materials(obj, gltf_path):
     if not images:
         return
 
-    texture_names = {
-        index: os.path.splitext(os.path.basename(image.get("uri", f"Texture_{index}")))[0]
-        for index, image in enumerate(images)
-    }
-
-    material_index_pattern = re.compile(r"Material[._]?(\d+)?")
+    texture_uris = {}
+    for index, image in enumerate(images):
+        uri = os.path.basename(image.get("uri", f"Texture_{index}"))
+        texture_name = os.path.splitext(uri)[0]
+        if index not in texture_uris:
+            texture_uris[index] = texture_name
 
     if obj.type == 'MESH':
         for slot in obj.material_slots:
             if slot.material:
-                match = material_index_pattern.search(slot.material.name)
-                if match:
-                    texture_index = int(match.group(1) or 0)
-                    if texture_index in texture_names:
-                        new_name = texture_names[texture_index]
-
-                        existing_material = bpy.data.materials.get(new_name)
-                        if existing_material:
-                            slot.material = existing_material
-                        else:
-                            slot.material.name = new_name
+                linked_texture = None
+                for node in slot.material.node_tree.nodes:
+                    if node.type == 'TEX_IMAGE' and node.image:
+                        linked_texture = node.image
+                        break
+                    elif node.type == 'GROUP' and node.node_tree:
+                        for group_node in node.node_tree.nodes:
+                            if group_node.type == 'TEX_IMAGE' and group_node.image:
+                                linked_texture = group_node.image
+                                break
+                
+                if linked_texture:
+                    texture_name = os.path.splitext(os.path.basename(linked_texture.filepath))[0]
+                    existing_material = bpy.data.materials.get(texture_name)
+                    
+                    if existing_material:
+                        slot.material = existing_material
+                    else:
+                        slot.material.name = texture_name
 
 def import_and_position_model(model):
     geom_path = os.path.join(MODEL_DIRECTORY, model["geom_name"])
