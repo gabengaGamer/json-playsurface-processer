@@ -7,11 +7,15 @@ import re
 
 MODEL_DIRECTORY = r"C:\Users\GameSpy\Downloads\IneV\rigidgeom" # Put here your gltf models.
 
-JSON_FILE_PATH = r"C:\Users\GameSpy\Downloads\IneV\data.json" # Put here exported playsurface .json from DFSViewer.
+PLAYSURFACE_FILE_PATH = r"C:\Users\GameSpy\Downloads\IneV\data.json" # Put here exported playsurface .json from DFSViewer.
+
+BIN_LEVEL_FILE_PATH = r"C:\Users\GameSpy\Downloads\IneV\data.json" # Put here exported bin_level .json from DFSViewer.
 
 imported_models_cache = {}
 
-def parse_json_file(file_path):
+## PLAYSURFACE CODE - START
+
+def parse_playsurface_file(file_path):
     with open(file_path, "r") as file:
         data = json.load(file)
 
@@ -25,7 +29,7 @@ def parse_json_file(file_path):
             models.append(model)
     return models
 
-def create_blender_matrix(l2w):
+def create_blender_playsurface_matrix(l2w):
     blender_matrix = mathutils.Matrix(l2w).transposed()
 
     z_up_to_y_up = mathutils.Matrix.Rotation(math.pi / 2, 4, 'X')
@@ -34,7 +38,7 @@ def create_blender_matrix(l2w):
 
     return corrected_matrix
 
-def apply_decomposed_transformations(obj, matrix):
+def apply_decomposed_playsurface_transformations(obj, matrix):
     translation, rotation, scale = matrix.decompose()
     
     obj.rotation_mode = 'QUATERNION'
@@ -42,7 +46,7 @@ def apply_decomposed_transformations(obj, matrix):
     obj.location = translation
     obj.scale = scale
     
-def rename_and_deduplicate_materials(obj, gltf_path):
+def rename_and_deduplicate_playsurface_materials(obj, gltf_path):
     with open(gltf_path, "r") as file:
         gltf_data = json.load(file)
 
@@ -80,12 +84,12 @@ def rename_and_deduplicate_materials(obj, gltf_path):
                     else:
                         slot.material.name = texture_name
 
-def import_and_position_model(model):
+def import_and_position_playsurface_model(model):
     geom_path = os.path.join(MODEL_DIRECTORY, model["geom_name"])
     if not os.path.exists(geom_path):
         return
 
-    l2w_matrix = create_blender_matrix(model["l2w"])
+    l2w_matrix = create_blender_playsurface_matrix(model["l2w"])
 
     if model["geom_name"] in imported_models_cache:
         imported_object = imported_models_cache[model["geom_name"]]
@@ -111,14 +115,15 @@ def import_and_position_model(model):
 
             unified_object = meshes_to_join[0]
             unified_object.matrix_world = l2w_matrix
-            rename_and_deduplicate_materials(unified_object, geom_path)
+            rename_and_deduplicate_playsurface_materials(unified_object, geom_path)
             imported_models_cache[model["geom_name"]] = unified_object
         else:
             for obj in imported_objects:
                 obj.matrix_world = l2w_matrix
-                rename_and_deduplicate_materials(obj, geom_path)
+                rename_and_deduplicate_playsurface_materials(obj, geom_path)
                 imported_models_cache[model["geom_name"]] = obj
 
+## PLAYSURFACE CODE - END
 
 def rotate_entire_scene():
     scene_rotation = mathutils.Matrix.Rotation(math.radians(90), 4, 'X')
@@ -128,13 +133,13 @@ def rotate_entire_scene():
             obj.matrix_world = scene_rotation @ obj.matrix_world
 
 def build_scene():
-    models = parse_json_file(JSON_FILE_PATH)
+    models = parse_playsurface_file(PLAYSURFACE_FILE_PATH)
 
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
 
     for model in models:
-        import_and_position_model(model)
+        import_and_position_playsurface_model(model)
 
     rotate_entire_scene()
 
