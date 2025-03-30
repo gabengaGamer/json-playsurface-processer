@@ -1,6 +1,6 @@
 ## Playsurface blender importer
 
-Made specifically for [DFS Viewer](https://github.com/bigianb/engine-51) and [Art2Code](https://github.com/gabengaGamer/area51-pc/releases/tag/Art2Code)
+Made specifically for [DFS Viewer](https://github.com/bigianb/engine-51)
 
 ## Join our Discord
 
